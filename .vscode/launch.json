@@ -1,0 +1,27 @@
+{
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Server",
+            "program": "${workspaceFolder}/${input:programPath}",
+            "cwd": "${workspaceFolder}",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "envFile": "${workspaceFolder}/.env.local"
+        }
+    ],
+    "inputs": [
+        {
+            "type": "pickString",
+            "id": "programPath",
+            "description": "Select the entry point for your application",
+            "options": [
+                "server.ts",
+                "src/main.tsx"
+            ]
+        }
+    ]
+}

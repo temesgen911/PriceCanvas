@@ -1,0 +1,5 @@
+{
+  "name": "Candlestick Drawing Board",
+  "description": "A practice instrument for building intuition about OHLC candle construction and price action sequencing.",
+  "requestFramePermissions": []
+}
