@@ -16,6 +16,7 @@ interface ChartBoardProps {
   sessionInfo: SessionInfo;
   activeCandleIndex: number | null;
   setActiveCandleIndex: (index: number | null) => void;
+  onHistoryCheckpoint: (state: { candles: Candle[], trendLines: TrendLine[], texts: TextElement[] }) => void;
 }
 
 export interface ChartBoardHandle {
@@ -35,6 +36,7 @@ const ChartBoard = forwardRef<ChartBoardHandle, ChartBoardProps>(({
   sessionInfo,
   activeCandleIndex,
   setActiveCandleIndex,
+  onHistoryCheckpoint
 }, ref) => {
   const stageRef = useRef<Konva.Stage>(null);
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -194,6 +196,9 @@ const ChartBoard = forwardRef<ChartBoardHandle, ChartBoardProps>(({
     const price = lastCandle ? lastCandle.close + (rawPrice - lastCandle.close) * smoothing : rawPrice;
 
     if (candleIndex !== activeCandleIndex && settings.continuousDraw) {
+      if (activeCandleIndex !== null) {
+        onHistoryCheckpoint({ candles, trendLines, texts });
+      }
       setActiveCandleIndex(candleIndex);
       setCandles(prev => {
         const lastCandle = prev.find(c => c.index === activeCandleIndex);
@@ -223,11 +228,28 @@ const ChartBoard = forwardRef<ChartBoardHandle, ChartBoardProps>(({
     setIsPanning(false);
     setLastPanPos(null);
 
-    setActiveCandleIndex(null);
+    let needsCheckpoint = false;
+    let finalTrendLines = trendLines;
+
     if (activeLineId) {
+      needsCheckpoint = true;
       // Remove lines that are just dots (start == end)
-      setTrendLines(prev => prev.filter(l => l.startIndex !== l.endIndex || l.startPrice !== l.endPrice));
+      const lines = trendLines.filter(l => l.startIndex !== l.endIndex || l.startPrice !== l.endPrice);
+      if (lines.length !== trendLines.length) {
+        finalTrendLines = lines;
+        setTrendLines(lines);
+        if (lines.length === trendLines.length - 1) {
+          needsCheckpoint = false;
+        }
+      }
       setActiveLineId(null);
+    } else if (activeCandleIndex !== null) {
+      needsCheckpoint = true;
+      setActiveCandleIndex(null);
+    }
+
+    if (needsCheckpoint) {
+      onHistoryCheckpoint({ candles, trendLines: finalTrendLines, texts });
     }
   };
 
@@ -538,17 +560,21 @@ const ChartBoard = forwardRef<ChartBoardHandle, ChartBoardProps>(({
           onChange={(e) => setEditingText({ ...editingText, text: e.target.value })}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              setTexts(prev => prev.map(t => t.id === editingText.id ? { ...t, text: editingText.text } : t).filter(t => t.text.trim() !== ''));
+              const newTexts = texts.map(t => t.id === editingText.id ? { ...t, text: editingText.text } : t).filter(t => t.text.trim() !== '');
+              setTexts(newTexts);
               setEditingText(null);
               setActiveTextId(null);
+              onHistoryCheckpoint({ candles, trendLines, texts: newTexts });
             }
             // Stop propagation to avoid accidentally triggering global shortcuts while typing
             e.stopPropagation();
           }}
           onBlur={() => {
-            setTexts(prev => prev.map(t => t.id === editingText.id ? { ...t, text: editingText.text } : t).filter(t => t.text.trim() !== ''));
+            const newTexts = texts.map(t => t.id === editingText.id ? { ...t, text: editingText.text } : t).filter(t => t.text.trim() !== '');
+            setTexts(newTexts);
             setEditingText(null);
             setActiveTextId(null);
+            onHistoryCheckpoint({ candles, trendLines, texts: newTexts });
           }}
           className={`absolute z-10 bg-transparent border-none outline-none font-sans text-sm ${isDark ? 'text-white drop-shadow-[0_1px_1px_rgba(0,0,0,1)]' : 'text-black drop-shadow-[0_1px_1px_rgba(255,255,255,1)]'}`}
           style={{

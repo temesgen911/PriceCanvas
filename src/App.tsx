@@ -80,12 +80,23 @@ export default function App() {
 
   // Undo/Redo logic
   const pushToHistory = useCallback((newCandles: Candle[], newTrendLines: TrendLine[], newTexts: TextElement[]) => {
+    if (historyIndex >= 0 && history[historyIndex]) {
+      const current = history[historyIndex];
+      const isSame = JSON.stringify(current.candles) === JSON.stringify(newCandles) &&
+        JSON.stringify(current.trendLines) === JSON.stringify(newTrendLines) &&
+        JSON.stringify(current.texts) === JSON.stringify(newTexts);
+      if (isSame) return;
+    }
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ candles: [...newCandles], trendLines: [...newTrendLines], texts: [...newTexts] });
     if (newHistory.length > 50) newHistory.shift();
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
   }, [history, historyIndex]);
+
+  const handleHistoryCheckpoint = useCallback((state: { candles: Candle[], trendLines: TrendLine[], texts: TextElement[] }) => {
+    pushToHistory(state.candles, state.trendLines, state.texts);
+  }, [pushToHistory]);
 
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
@@ -95,6 +106,7 @@ export default function App() {
       setTexts(prev.texts);
       setHistoryIndex(historyIndex - 1);
     } else if (historyIndex === 0) {
+      // Revert completely to empty if we hit the very beginning of the history
       setCandles([]);
       setTrendLines([]);
       setTexts([]);
@@ -112,27 +124,11 @@ export default function App() {
     }
   }, [history, historyIndex]);
 
-  // Update history when drawing ends
-  useEffect(() => {
-    if (activeCandleIndex === null && (candles.length > 0 || trendLines.length > 0 || texts.length > 0)) {
-      // Check if current state is different from last history entry
-      const lastHistory = history[historyIndex];
-      const currentStateStr = JSON.stringify({ candles, trendLines, texts });
-      const lastHistoryStr = JSON.stringify(lastHistory || { candles: [], trendLines: [], texts: [] });
-
-      if (!lastHistory || currentStateStr !== lastHistoryStr) {
-        pushToHistory(candles, trendLines, texts);
-      }
-    }
-  }, [activeCandleIndex, candles, trendLines, texts, history, historyIndex, pushToHistory]);
-
   const handleClear = () => {
-    if (confirm('Clear all drawings?')) {
-      setCandles([]);
-      setTrendLines([]);
-      setTexts([]);
-      pushToHistory([], [], []);
-    }
+    setCandles([]);
+    setTrendLines([]);
+    setTexts([]);
+    pushToHistory([], [], []);
   };
 
   const handleCreateNew = () => {
@@ -352,6 +348,7 @@ export default function App() {
         sessionInfo={sessionInfo}
         activeCandleIndex={activeCandleIndex}
         setActiveCandleIndex={setActiveCandleIndex}
+        onHistoryCheckpoint={handleHistoryCheckpoint}
       />
 
       <Toolbar
